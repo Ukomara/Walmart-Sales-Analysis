@@ -1,0 +1,281 @@
+---
+title: "final_eda"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+can help in customer demands to better understand about stock,staff and marketing etc
+
+examine busy periods
+and if they come around holidays?
+if holidays what holiday seasons have more /less ?
+
+
+```{r}
+Walmart_Stores_sales=read.csv("/Users/ushabhanu/Downloads/Walmart (1).csv")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r}
+head(Walmart_Stores_sales )
+```
+```{r}
+library(lubridate)
+library(zoo)
+library(dplyr)
+x<-as.factor(Walmart_Stores_sales$Date)
+abis<-strptime(x,format="%d-%m-%Y")
+Walmart_Stores_sales$Month_Year<-as.Date(abis,format="%Y-%m-%d")
+Walmart_Stores_sales$Month_Year = as.yearmon(Walmart_Stores_sales$Month_Year)
+
+Monthly_Sales<-summarise(group_by(Walmart_Stores_sales,Month_Year),mean(Weekly_Sales))
+colnames(Monthly_Sales)[2] <- "Monthly_Sales"
+Monthly_Sales<- as.data.frame(Monthly_Sales)
+Monthly_Sales$Month_Year<- as.character(Monthly_Sales$Month_Year)
+Monthly_Sales$Month_Year<- factor(Monthly_Sales$Month_Year, levels=Monthly_Sales$Month_Year)
+head(Monthly_Sales)
+```
+
+
+```{r}
+library(ggplot2)
+library(scales)
+ggplot(data=Monthly_Sales, aes(x=Month_Year, y=Monthly_Sales, group=1)) +
+  geom_line(color="steelblue")+
+  geom_point()+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_y_continuous(labels = label_number(suffix = " M", scale = 1e-6))+
+  ggtitle('Monthly Sales from 2010 to 2012')+
+  theme(plot.title = element_text(hjust = 0.5))+
+  xlab("Month_Year") + ylab("Average Sales in a Month")
+```
+
+
+we can observe spikes at the end of the year.that time we have thanks giving and christmas . we can dive much deeper to examine this further.
+
+
+
+```{r}
+holiday <- c("12-02-2010", "11-02-2011", "10-02-2012", "08-02-2013","10-09-2010", "09-09-2011", "07-09-2012", "06-09-2013","26-11-2010", "25-11-2011", "23-11-2012", "29- 11-2013","31-12-2010", "30-12-2011", "28-12-2012", "27-12-2013")
+```
+
+```{r}
+Occasion <-c(rep("Super Bowl", 4), rep("Labour Day", 4),rep("Thanksgiving", 4), rep("Christmas", 4))
+```
+
+```{r}
+Holidays <- data.frame(Occasion,holiday)
+Holidays
+```
+
+
+```{r}
+Walmart_data<-merge(Walmart_Stores_sales,Holidays, by.x= "Date", by.y="holiday", all.x = TRUE)
+head(Walmart_data)
+```
+
+
+
+```{r}
+Walmart_data$Occasion = as.character(Walmart_data$Occasion) 
+Walmart_data$Occasion[is.na(Walmart_data$Occasion)]= "Not_a_Holiday" 
+head(Walmart_data)
+```
+
+
+```{r}
+Holiday_date = filter(Walmart_data,Holiday_Flag ==1)
+Holiday_Date_Sales=summarise(group_by(Holiday_date,Date),mean(Weekly_Sales))
+
+mean_non_holiday_sales = mean(filter(Walmart_data,Holiday_Flag ==0)$Weekly_Sales) 
+Holiday_Date_Sales$higher_than_non_holiday <- Holiday_Date_Sales[,2] > mean_non_holiday_sales
+View(Holiday_Date_Sales)
+```
+
+
+
+
+```{r}
+weekly_sales = aggregate(Weekly_Sales~Date, data=Walmart_data,mean)
+weekly_sales$Date <-as.Date(weekly_sales$Date, "%d-%m-%Y")
+weekly_sales = arrange(weekly_sales,Date)
+weekly_sales$Date <-factor(weekly_sales$Date)
+weekly_sales
+options(repr.plot.width = 14, repr.plot.height = 8)
+
+
+```
+```{r}
+#library(scales)
+df=ggplot(data=weekly_sales, aes(x=Date, y=Weekly_Sales, group=1)) +
+geom_line(color="steelblue")+
+  theme_light()+
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_x_discrete(breaks = levels(weekly_sales$Date)[c(T, rep(F, 9))])+
+scale_y_continuous(labels = label_number(suffix = " M", scale = 1e-6))+
+  theme(plot.title = element_text(hjust = 0.5))+
+  xlab("Week") + ylab("Weekly Average Sales")
+df
+
+```
+
+
+```{r}
+df +ggtitle('CHRISTMAS')+
+  geom_point(aes(x = factor("2010-12-31"), y = 898500.4), color = "green", size = 3) +
+  geom_point(aes(x = factor("2011-12-30"), y = 1023165.8), color = "green", size = 3)+
+  geom_hline(aes(yintercept = mean_non_holiday_sales), linetype="solid")
+```
+
+```{r}
+df + ggtitle('LABOUR DAY')+
+  geom_point(aes(x = factor("2010-09-10"), y = 1014097.7), color = "red", size = 3) +
+  geom_point(aes(x = factor("2011-09-09"), y = 1039182.8), color = "red", size = 3) +
+  geom_point(aes(x = factor("2012-09-07"), y = 	1074001.3), color = "red", size = 3) +
+  geom_hline(aes(yintercept = mean_non_holiday_sales), linetype="solid")
+
+```
+
+
+```{r}
+df + ggtitle('THANKS GIVING')+
+  geom_point(aes(x = factor("2010-11-26"), y = 	1462689.0), color = "orange", size = 3) +
+  geom_point(aes(x = factor("2011-11-25"), y = 1479857.9), color = "orange", size = 3) +
+  geom_hline(aes(yintercept = mean_non_holiday_sales), linetype="solid")
+```
+
+
+```{r}
+df + ggtitle('SUPER BOWL')+
+  geom_point(aes(x = factor("2010-02-12"), y = 	1074148.4),color = "purple", size = 3) +
+  geom_point(aes(x = factor("2011-02-11"), y = 1051915.4), color = "purple", size = 3) +
+  geom_point(aes(x = factor("2012-02-10"), y = 1111320.2), color = "purple", size = 3) +
+  geom_hline(aes(yintercept = mean_non_holiday_sales), linetype="solid")
+```
+```{r}
+ggplot(data=Monthly_Sales, aes(x=Month_Year, y=Monthly_Sales, group=1)) +
+  geom_line(color="steelblue")+
+  geom_point()+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_y_continuous(labels = label_number(suffix = " M", scale = 1e-6))+
+  ggtitle('Monthly Sales from 2010 to 2012')+
+  theme(plot.title = element_text(hjust = 0.5))+
+  xlab("Month_Year") + ylab("Average Sales in a Month")+
+  geom_hline(aes(yintercept = mean_non_holiday_sales), linetype="solid")
+```
+
+
+```{r}
+df
+```
+
+
+
+
+
+
+```{r}
+df + ggtitle('HOLIDAYS')+
+  geom_point(aes(x = factor("2010-12-31"), y = 898500.4), color = "green", size = 3) +
+  geom_point(aes(x = factor("2011-12-30"), y = 1023165.8), color = "green", size = 3)+
+  geom_point(aes(x = factor("2010-09-10"), y = 1014097.7), color = "red", size = 3) +
+  geom_point(aes(x = factor("2011-09-09"), y = 1039182.8), color = "red", size = 3) +
+  geom_point(aes(x = factor("2012-09-07"), y = 	1074001.3), color = "red", size = 3) +
+  geom_point(aes(x = factor("2010-11-26"), y = 	1462689.0), color = "orange", size = 3) +
+  geom_point(aes(x = factor("2011-11-25"), y = 1479857.9), color = "orange", size = 3) +
+  geom_point(aes(x = factor("2010-02-12"), y = 	1074148.4), color = "purple", size = 3) +
+  geom_point(aes(x = factor("2011-02-11"), y = 1051915.4), color = "purple", size = 3) +
+  geom_point(aes(x = factor("2012-02-10"), y = 1111320.2), color = "purple", size = 3) +
+  geom_hline(aes(yintercept = mean_non_holiday_sales), linetype="solid")
+```
+
+```{r}
+df + ggtitle('HOLIDAYS')+
+  geom_point(aes(x = factor("2010-12-31"), y = 898500.4,color="Christmas"), size = 3) +
+  geom_point(aes(x = factor("2011-12-30"), y = 1023165.8,color="Christmas"), size = 3)+
+  geom_point(aes(x = factor("2010-09-10"), y = 1014097.7,color="Labour Day"), size = 3) +
+  geom_point(aes(x = factor("2011-09-09"), y = 1039182.8,color="Labour Day"), size = 3) +
+  geom_point(aes(x = factor("2012-09-07"), y = 	1074001.3,color="Labour Day"), size = 3) +
+  geom_point(aes(x = factor("2010-11-26"), y = 	1462689.0,color="Thanksgiving"), size = 3) +
+  geom_point(aes(x = factor("2011-11-25"), y = 1479857.9,color="Thanksgiving"), size = 3) +
+  geom_point(aes(x = factor("2010-02-12"), y = 	1074148.4,color="Super bowl"), size = 3) +
+  geom_point(aes(x = factor("2011-02-11"), y = 1051915.4,color="Super bowl"), size = 3) +
+  geom_point(aes(x = factor("2012-02-10"), y = 1111320.2,color="Super bowl"), size = 3) +
+  geom_hline(aes(yintercept = mean_non_holiday_sales), linetype="solid")
+```
+
+
+
+```{r}
+cordata <- Walmart_data[, c("Weekly_Sales", "Temperature","CPI","Fuel_Price","Unemployment")]
+corr <- round(cor(cordata), 1)
+corr
+```
+
+Values closer to zero means there is no linear trend between the two variables
+```{r}
+library(corrplot)
+corrplot(corr, method="number")
+```
+
+
+
+```{r}
+data4 <- Walmart_data
+data4$Date <- as.Date(data4$Date, '%d-%m-%Y')
+#data4 <- dplyr::arrange(data4,Date)
+data4$Week_Number <- seq(1:length(unique(data4$Date)))
+data4$month <- lubridate::month(data4$Date)
+data4
+data5 <- data4
+```
+
+```{r}
+data4 <- Walmart_data
+data4$Date <- lubridate::dmy(data4$Date)
+data4 <- dplyr::arrange(data4,Date)
+data4$Week_Number <- seq(1:length(unique(data4$Date)))
+data4$month <- lubridate::month(data4$Date)
+data4$quarter <- lubridate::quarter(data4$Date)
+
+data4
+```
+```{r}
+data5 <- data4
+data5$Weekly_Sales = format(data5$Weekly_Sales, scientific = FALSE)
+print(data5)
+class(data5$month)
+#boxplot(data5$Weekly_Sales ~ data5$month, data5,main = 'Weekly Sales - month', xlab ="Month", ylab="Weekly Sales", col="Steel Blue")
+```
+```{r}
+#data5$month = as.character(data5$month)
+#ggplot(data5,aes(x=reorder(month,Month_Year),y=Weekly_Sales))+geom_boxplot()+scale_y_continuous(labels = comma)+xlab('Month')+ylab('Weekly Sales')
+```
+
+```{r}
+boxplot(data5$Weekly_Sales~ cut(data5$Temperature,pretty(data5$Temperature)),col="Steel Blue")
+```
+
+
+
+```{r}
+cordata1 <- data5[, c("Weekly_Sales", "Temperature","CPI","Fuel_Price","Unemployment","Week_Number","month","quarter")]
+corr1 <- round(cor(cordata1), 1)
+corr1
+```
+
+
+```{r}
+corrplot(corr1, method="number")
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
